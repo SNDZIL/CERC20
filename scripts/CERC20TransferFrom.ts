@@ -117,8 +117,8 @@ async function main() {
     approve = await CERC20Contract.getAllowance(walletAddress, user1Address);
     console.log(`user allowance(euint64) after approve: ${approve}`);
     console.log("-------------------user spend 5000 from owner's wallet---------------------");
-    // CERC20Contract.connect(user1).transferFrom(walletAddress, walletAddress, 5000);
-    CERC20Contract.transferFrom(walletAddress, user1Address, 5000);
+    CERC20Contract.connect(user1).transferFrom(walletAddress, user1Address, 5000);
+    // CERC20Contract.transferFrom(walletAddress, walletAddress, 5000);
     nextTest = true;
   });
 
