@@ -17,16 +17,10 @@ npm install
 
 npm run sight:stop ;npm run sight:start
 
-npx hardhat run --no-compile scripts/Example.ts
-npx hardhat run --no-compile scripts/MultiStepExample.ts
-npx hardhat run --no-compile scripts/SaveCiphertextAndReencryptExample.ts
-npx hardhat run --no-compile scripts/SaveBytesAndSelectResultExample.ts
-npx hardhat run --no-compile scripts/AsyncDecryptExample.ts
+npx hardhat run scripts/CERC20deploy.ts
+npx hardhat run scripts/CERC20TransferFrom.ts
+npx hardhat run scripts/CERC20AccountList.ts
 
-# ignition deploy
-npx hardhat run --no-compile scripts/DecryptExample.ts
-npx hardhat run --no-compile scripts/DecryptCapsulatedValueExample.ts
-npx hardhat run --no-compile scripts/ChangeEncryptedValueACL.ts
 
 # for i in {1..10}; do idx=${i} npx hardhat run --no-compile scripts/MultiStepExampleParallel.ts & done
 # for i in {1..10}; do idx=${i} npx hardhat run --no-compile scripts/AsyncDecryptExampleParallel.ts & done
