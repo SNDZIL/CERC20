@@ -102,9 +102,9 @@ async function main() {
     console.log(`totalsuply after mint callback: `, totalsuply);
     console.log(`owner balance(euint64) after burn callback: `, balance);
     console.log("-------------------------Approve 10000 to user---------------------------");
-    approve = await CERC20Contract.getAllowance(walletAddress, walletAddress);
+    approve = await CERC20Contract.getAllowance(walletAddress, user1Address);
     console.log(`user allowance(euint64) before approve: ${approve}`);
-    CERC20Contract.approve(walletAddress, 10000);
+    CERC20Contract.approve(user1Address, 10000);
     nextTest = true;
   });
 
@@ -114,11 +114,11 @@ async function main() {
   nextTest = false;
 
   CERC20Contract.once(CERC20Contract.filters.OracleCallback, async (reqId, event) => {
-    approve = await CERC20Contract.getAllowance(walletAddress, walletAddress);
+    approve = await CERC20Contract.getAllowance(walletAddress, user1Address);
     console.log(`user allowance(euint64) after approve: ${approve}`);
     console.log("-------------------user spend 5000 from owner's wallet---------------------");
     // CERC20Contract.connect(user1).transferFrom(walletAddress, walletAddress, 5000);
-    CERC20Contract.transferFrom(walletAddress, walletAddress, 5000);
+    CERC20Contract.transferFrom(walletAddress, user1Address, 5000);
     nextTest = true;
   });
 
@@ -130,7 +130,7 @@ async function main() {
   CERC20Contract.once(CERC20Contract.filters.Transfer, async (sender, receiver) => {
     balance = await CERC20Contract.balanceOf(walletAddress);
     console.log(`owner balance(euint64) after this spending: ${balance}`);
-    approve = await CERC20Contract.getAllowance(walletAddress, walletAddress);
+    approve = await CERC20Contract.getAllowance(walletAddress, user1Address);
     console.log(`user allowance(euint64) before approve: ${approve}`);
     nextTest = true;
   });
