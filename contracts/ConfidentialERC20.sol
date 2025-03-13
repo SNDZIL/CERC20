@@ -6,8 +6,7 @@ import "@sight-oracle/contracts/Oracle/Oracle.sol";
 import "@sight-oracle/contracts/Oracle/RequestBuilder.sol";
 import "@sight-oracle/contracts/Oracle/CapsulatedValueResolver.sol";
 
-
-contract ConfidentialERC20 is Ownable2Step{
+contract ConfidentialERC20 is Ownable2Step {
     using RequestBuilder for Request;
     using ResponseResolver for CapsulatedValue;
 
@@ -15,8 +14,11 @@ contract ConfidentialERC20 is Ownable2Step{
     event Mint(address indexed to, uint64 amount);
     event Burn(address indexed from, uint64 amount);
     event Approve(address indexed from, address indexed to);
+    event ViewApprove(address indexed from, address indexed to);
+    event withdrawApprove(address indexed from, address indexed to);
     event OracleCallback(bytes32 indexed reqId);
     event InitializeOracleCallback(bytes32 indexed reqId);
+    event DecryBalance(address indexed from);
 
     // totalsupply & name & symbol & decimals
     uint64 private _totalSupply;
@@ -33,12 +35,13 @@ contract ConfidentialERC20 is Ownable2Step{
     uint64 private result;
 
     // transfer context, for callback function
-    struct TransferContext {    // transfer info
-    address sender;
-    address receiver;
-    uint8 isSpecial;    // 0: normal, 1: mint, 2: burn, 3: transferFrom
+    struct TransferContext {
+        // transfer info
+        address sender;
+        address receiver;
+        uint8 isSpecial; // 0: normal, 1: mint, 2: burn, 3: transferFrom
     }
-    mapping(bytes32 => TransferContext) internal _transferContexts;     
+    mapping(bytes32 => TransferContext) internal _transferContexts;
     mapping(bytes32 => address) internal _addressContexts;
     mapping(bytes32 => uint64) internal _supplyContexts;
 
@@ -50,7 +53,6 @@ contract ConfidentialERC20 is Ownable2Step{
     mapping(address account => uint64) internal _decryptBalance;
     mapping(address account => mapping(address viewer => bool)) internal _viewBalanceApproval;
 
-
     constructor(string memory name_, string memory symbol_, address oracle_, bytes memory initial_) Ownable() {
         _name = name_;
         _symbol = symbol_;
@@ -60,12 +62,13 @@ contract ConfidentialERC20 is Ownable2Step{
 
     // initialize the defalut zero value
     function initializeValue(bytes memory zero) public onlyOwner {
+        require(!isInitialized, "Has already initialized.");
         Request memory r = RequestBuilder.newRequest(
-            msg.sender,              // Requester address
-            2,                       // Number of operations
-            address(this),           // Callback address
-            this.callbackInitializeValue.selector,  // Callback function
-            ""                       // Payload
+            msg.sender, // Requester address
+            2, // Number of operations
+            address(this), // Callback address
+            this.callbackInitializeValue.selector, // Callback function
+            "" // Payload
         );
         op savedZero = r.saveEuint64Bytes(zero);
         r.decryptEuint64(savedZero);
@@ -117,18 +120,17 @@ contract ConfidentialERC20 is Ownable2Step{
     }
 
     // mint
-    function mint(uint64 amount) public virtual onlyOwner{
-        _mint(msg.sender, amount * uint64(10) **_decimals);
+    function mint(uint64 amount) public virtual onlyOwner {
+        _mint(msg.sender, amount * uint64(10) ** _decimals);
     }
 
     // burn
-    function burn(uint64 amount) public virtual{
-        _burn(msg.sender, amount * uint64(10) **_decimals);
+    function burn(uint64 amount) public virtual {
+        _burn(msg.sender, amount * uint64(10) ** _decimals);
     }
 
-    
     // transfer
-    function transfer(address to, uint64 value) public virtual returns (bool){
+    function transfer(address to, uint64 value) public virtual returns (bool) {
         _transfer(msg.sender, to, value);
         return true;
     }
@@ -158,37 +160,38 @@ contract ConfidentialERC20 is Ownable2Step{
         require(_getInitialized(_allowances[from][spender]), "Please initialize approval first.");
         makeTransfer(from, to, value, true);
         return true;
-    } 
+    }
 
     // decrypt a user's balance
-    function decrypteUserBalance(address user) public {
-        require(msg.sender == user || _viewBalanceApproval[user][msg.sender] || msg.sender == owner(), "Not Approval.");      // add owner for testing
+    function decrypteUserBalance(address user) public virtual {
+        require(msg.sender == user || _viewBalanceApproval[user][msg.sender] || msg.sender == owner(), "Not Approval."); // add owner for testing
         _setBalanceInitialized(user);
         require(_getInitialized(_balances[user]), "Please initialize balance first.");
         _decrypteUserBalance(user);
     }
 
     // get a user's decrypt balance
-    function getDecryptBalance(address user) public view returns(uint64) {
-        require(msg.sender == user || _viewBalanceApproval[user][msg.sender] || msg.sender == owner(), "Not approval.");    // add owner for testing
+    function getDecryptBalance(address user) public view virtual returns (uint64) {
+        require(msg.sender == user || _viewBalanceApproval[user][msg.sender] || msg.sender == owner(), "Not approval."); // add owner for testing
         return _decryptBalance[user];
     }
 
     // approve a user to view the decrypt balance
-    function approveView(address viewer) public {
+    function approveView(address viewer) public virtual {
         address user = msg.sender;
         require(user != address(0), "Confidential ERC20: approve from the zero address");
         require(viewer != address(0), "Confidential ERC20: approve to the zero address");
         _viewBalanceApproval[user][viewer] = true;
+        emit ViewApprove(user, viewer);
     }
     // withdraw the approval
-    function withdrawApproval(address viewer) public {
+    function withdrawApproval(address viewer) public virtual {
         address user = msg.sender;
         require(user != address(0), "Confidential ERC20: withdraw from the zero address");
         require(viewer != address(0), "Confidential ERC20: withdraw to the zero address");
         _viewBalanceApproval[user][viewer] = false;
+        emit withdrawApprove(user, viewer);
     }
-
 
     // internal function and callback function
 
@@ -199,7 +202,7 @@ contract ConfidentialERC20 is Ownable2Step{
         require(_getInitialized(_balances[minter]), "Please initialize balance first.");
         makeTransfer(address(0), minter, value);
     }
-    
+
     // burn
     function _burn(address burner, uint64 value) internal {
         require(burner != address(0), "Confidential ERC20: burn from the zero address");
@@ -221,30 +224,30 @@ contract ConfidentialERC20 is Ownable2Step{
 
     // get the state of default zero initialization (if initialized: true, uninitialized: false)
     function _getInitialized(euint64 value) internal pure returns (bool) {
-        return uint256(euint64.unwrap(value)) == 0? false: true;
+        return uint256(euint64.unwrap(value)) == 0 ? false : true;
     }
 
     // initialize the balance and allowance with default zero
     function _setBalanceInitialized(address user) internal onlyInitialized {
-        if(!_getInitialized(_balances[user])) {
+        if (!_getInitialized(_balances[user])) {
             _balances[user] = initialValue;
         }
     }
     function _setAllowanceInitialized(address approver, address spender) internal onlyInitialized {
-        if(!_getInitialized(_allowances[approver][spender])) {
+        if (!_getInitialized(_allowances[approver][spender])) {
             _allowances[approver][spender] = initialValue;
         }
     }
 
     // approve
-    function _approve(address approver, address spender, uint64 value) internal virtual returns(bool){
+    function _approve(address approver, address spender, uint64 value) internal virtual returns (bool) {
         Request memory r = RequestBuilder.newRequest(
-            msg.sender,              // Requester address
-            2,                       // Number of operations
-            address(this),           // Callback address
-            this.callbackApprove.selector,  // Callback function
-            ""                       // Payload
-        );            
+            msg.sender, // Requester address
+            2, // Number of operations
+            address(this), // Callback address
+            this.callbackApprove.selector, // Callback function
+            "" // Payload
+        );
         op loadSenderAllowance = r.getEuint64(_allowances[approver][spender]);
         r.add(loadSenderAllowance, value);
 
@@ -254,17 +257,17 @@ contract ConfidentialERC20 is Ownable2Step{
         return true;
     }
 
-    function callbackApprove(bytes32 reqId, CapsulatedValue[] memory values) public onlyOracle {      
+    function callbackApprove(bytes32 reqId, CapsulatedValue[] memory values) public virtual onlyOracle {
         address approver = _transferContexts[reqId].sender;
         address spender = _transferContexts[reqId].receiver;
         _allowances[approver][spender] = values[1].asEuint64();
         emit Approve(approver, spender);
-        emit OracleCallback(reqId);     // for testing
+        emit OracleCallback(reqId); // for testing
         delete _transferContexts[reqId];
     }
 
     // request to decrypt a user's balance
-    function _decrypteUserBalance(address user) internal {
+    function _decrypteUserBalance(address user) internal virtual {
         // Initialize new FHE computation request of a single step.
         Request memory r = RequestBuilder.newRequest(
             msg.sender,
@@ -282,8 +285,9 @@ contract ConfidentialERC20 is Ownable2Step{
         _addressContexts[latestReqId] = user;
     }
 
-    function callbackDecrypteUserBalance(bytes32 reqId, CapsulatedValue[] memory values) public onlyOracle {        
+    function callbackDecrypteUserBalance(bytes32 reqId, CapsulatedValue[] memory values) public virtual onlyOracle {
         _decryptBalance[_addressContexts[reqId]] = values[1].asUint64();
+        emit DecryBalance(_addressContexts[reqId]);
         delete _addressContexts[reqId];
         emit OracleCallback(reqId);
     }
@@ -291,36 +295,41 @@ contract ConfidentialERC20 is Ownable2Step{
     // request other kinds of txns to Oracle
     function makeTransfer(address from, address to, uint64 value) internal virtual returns (bool) {
         return _makeTransfer(from, to, value, false);
-    }   
+    }
     function makeTransfer(address from, address to, uint64 value, bool isTransferFrom) internal virtual returns (bool) {
         return _makeTransfer(from, to, value, isTransferFrom);
-    }   
+    }
 
-    function _makeTransfer(address from, address to, uint64 value, bool isTransferFrom) internal virtual onlyInitialized returns (bool) {
+    function _makeTransfer(
+        address from,
+        address to,
+        uint64 value,
+        bool isTransferFrom
+    ) internal virtual onlyInitialized returns (bool) {
         //transferFrom
-        if(isTransferFrom) {
+        if (isTransferFrom) {
             return _makeTransferFrom(from, to, value);
-        }else {
-            if(from == address(0)) {
+        } else {
+            if (from == address(0)) {
                 // mint
                 return _makeMint(to, value);
-            }else if(to == address(0)) {
+            } else if (to == address(0)) {
                 // burn
                 return _makBurn(from, value);
-            }else {
+            } else {
                 return _makeNormalTransfer(from, to, value);
             }
-        } 
+        }
     }
 
     // detailed function of _makeTransfer
-    function _makeTransferFrom(address from, address to, uint64 value) internal virtual onlyInitialized returns(bool) {
+    function _makeTransferFrom(address from, address to, uint64 value) internal virtual onlyInitialized returns (bool) {
         Request memory r = RequestBuilder.newRequest(
-            msg.sender,              // Requester address
-            6,                       // Number of operations
-            address(this),           // Callback address
-            this.callbackMakeTransfer.selector,  // Callback function
-            ""                       // Payload
+            msg.sender, // Requester address
+            6, // Number of operations
+            address(this), // Callback address
+            this.callbackMakeTransfer.selector, // Callback function
+            "" // Payload
         );
         op loadCallerAllance = r.getEuint64(_allowances[from][msg.sender]);
         r.sub(loadCallerAllance, value);
@@ -337,15 +346,15 @@ contract ConfidentialERC20 is Ownable2Step{
         return true;
     }
 
-    function _makeMint(address to, uint64 value) internal virtual onlyInitialized returns(bool) {
+    function _makeMint(address to, uint64 value) internal virtual onlyInitialized returns (bool) {
         Request memory r = RequestBuilder.newRequest(
-            msg.sender,              // Requester address
-            2,                       // Number of operations
-            address(this),           // Callback address
-            this.callbackMakeTransfer.selector,  // Callback function
-            ""                       // Payload
+            msg.sender, // Requester address
+            2, // Number of operations
+            address(this), // Callback address
+            this.callbackMakeTransfer.selector, // Callback function
+            "" // Payload
         );
-        
+
         op loadReceiverBalance = r.getEuint64(_balances[to]);
         r.add(loadReceiverBalance, value);
 
@@ -356,15 +365,15 @@ contract ConfidentialERC20 is Ownable2Step{
         return true;
     }
 
-    function _makBurn(address from, uint64 value) internal virtual onlyInitialized returns(bool) {
+    function _makBurn(address from, uint64 value) internal virtual onlyInitialized returns (bool) {
         Request memory r = RequestBuilder.newRequest(
-            msg.sender,              // Requester address
-            2,                       // Number of operations
-            address(this),           // Callback address
-            this.callbackMakeTransfer.selector,  // Callback function
-            ""                       // Payload
+            msg.sender, // Requester address
+            2, // Number of operations
+            address(this), // Callback address
+            this.callbackMakeTransfer.selector, // Callback function
+            "" // Payload
         );
-        
+
         op loadSenderBalance = r.getEuint64(_balances[from]);
         r.sub(loadSenderBalance, value);
 
@@ -375,14 +384,18 @@ contract ConfidentialERC20 is Ownable2Step{
         return true;
     }
 
-    function _makeNormalTransfer(address from, address to, uint64 value) internal virtual onlyInitialized returns(bool) {
+    function _makeNormalTransfer(
+        address from,
+        address to,
+        uint64 value
+    ) internal virtual onlyInitialized returns (bool) {
         Request memory r = RequestBuilder.newRequest(
-            msg.sender,              // Requester address
-            4,                       // Number of operations
-            address(this),           // Callback address
-            this.callbackMakeTransfer.selector,  // Callback function
-            ""                       // Payload
-        );            
+            msg.sender, // Requester address
+            4, // Number of operations
+            address(this), // Callback address
+            this.callbackMakeTransfer.selector, // Callback function
+            "" // Payload
+        );
         op loadSenderBalance = r.getEuint64(_balances[from]);
         r.sub(loadSenderBalance, value);
         op loadReceiverBalance = r.getEuint64(_balances[to]);
@@ -436,5 +449,4 @@ contract ConfidentialERC20 is Ownable2Step{
         require(isInitialized, "Not initialized");
         _;
     }
-
 }
