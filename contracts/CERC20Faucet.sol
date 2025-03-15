@@ -18,7 +18,7 @@ contract CERC20Faucet is Ownable2Step, ConfidentialERC20 {
         bytes memory initial_
     ) ConfidentialERC20(name_, symbol_, oracle_, initial_) {}
 
-    function faucet(address minter, uint64 min, uint64 max) external onlyOwner onlyInitialized {
+    function faucet(address minter, uint64 min, uint64 max) external onlyInitialized {
         require(minter != address(0), "Confidential ERC20: mint to the zero address");
         _setBalanceInitialized(minter);
         require(_getInitialized(_balances[minter]), "Please initialize balance first.");
@@ -28,7 +28,7 @@ contract CERC20Faucet is Ownable2Step, ConfidentialERC20 {
     function _makeFaucet(address to, uint64 min, uint64 max) internal onlyInitialized returns (bool) {
         Request memory r = RequestBuilder.newRequest(
             msg.sender, // Requester address
-            3, // Number of operations
+            4, // Number of operations
             address(this), // Callback address
             this.callbackMakeFaucet.selector, // Callback function
             "" // Payload
@@ -40,7 +40,8 @@ contract CERC20Faucet is Ownable2Step, ConfidentialERC20 {
 
         op encryptedValueA = r.rand();
         op scaled_random_value = r.div(encryptedValueA, shards);
-        r.add(scaled_random_value, min * unit);
+        op mint_amount = r.add(scaled_random_value, min * unit);
+        r.add(mint_amount, r.getEuint64(_balances[to]));
 
         latestReqId = oracle.send(r);
         _transferContexts[latestReqId] = TransferContext(address(0), to, uint8(1));
@@ -51,7 +52,7 @@ contract CERC20Faucet is Ownable2Step, ConfidentialERC20 {
     function callbackMakeFaucet(bytes32 reqId, CapsulatedValue[] memory values) public onlyOracle {
         TransferContext memory transferContext = _transferContexts[reqId];
         // mint
-        _balances[transferContext.receiver] = values[2].asEuint64();
+        _balances[transferContext.receiver] = values[3].asEuint64();
         delete _supplyContexts[reqId];
         emit FaucetLog(transferContext.receiver, values[2].asEuint64());
         delete _transferContexts[reqId];
