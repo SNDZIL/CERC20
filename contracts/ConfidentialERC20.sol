@@ -18,7 +18,7 @@ contract ConfidentialERC20 is Ownable2Step {
     event withdrawApprove(address indexed from, address indexed to);
     event OracleCallback(bytes32 indexed reqId);
     event InitializeOracleCallback(bytes32 indexed reqId);
-    event DecryBalance(address indexed from);
+    event DecrytBalance(address indexed from);
 
     // totalsupply & name & symbol & decimals
     uint64 private _totalSupply;
@@ -287,7 +287,7 @@ contract ConfidentialERC20 is Ownable2Step {
 
     function callbackDecrypteUserBalance(bytes32 reqId, CapsulatedValue[] memory values) public virtual onlyOracle {
         _decryptBalance[_addressContexts[reqId]] = values[1].asUint64();
-        emit DecryBalance(_addressContexts[reqId]);
+        emit DecrytBalance(_addressContexts[reqId]);
         delete _addressContexts[reqId];
         emit OracleCallback(reqId);
     }

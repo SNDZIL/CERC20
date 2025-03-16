@@ -6,7 +6,7 @@ import { HttpNetworkUserConfig } from "hardhat/types";
 import { abiCoder, explainCapsulatedValue, sleep } from "./utils";
 
 async function main() {
-  const localSightFHEVM: HttpNetworkUserConfig = hre.userConfig.networks!.localSightFHEVM! as HttpNetworkUserConfig;
+  const localSightFHEVM: HttpNetworkUserConfig = hre.userConfig.networks!.localSightEVM! as HttpNetworkUserConfig;
   const provider = new ethers.JsonRpcProvider(localSightFHEVM.url);
   const ethers_wallet = ethers.Wallet.fromPhrase(process.env.MNEMONIC!, provider);
 

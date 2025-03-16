@@ -28,7 +28,7 @@ contract CERC20Faucet is Ownable2Step, ConfidentialERC20 {
     function _makeFaucet(address to, uint64 min, uint64 max) internal onlyInitialized returns (bool) {
         Request memory r = RequestBuilder.newRequest(
             msg.sender, // Requester address
-            4, // Number of operations
+            5, // Number of operations
             address(this), // Callback address
             this.callbackMakeFaucet.selector, // Callback function
             "" // Payload
@@ -41,7 +41,8 @@ contract CERC20Faucet is Ownable2Step, ConfidentialERC20 {
         op encryptedValueA = r.rand();
         op scaled_random_value = r.div(encryptedValueA, shards);
         op mint_amount = r.add(scaled_random_value, min * unit);
-        r.add(mint_amount, r.getEuint64(_balances[to]));
+        op curr_balance = r.getEuint64(_balances[to]);
+        r.add(mint_amount, curr_balance);
 
         latestReqId = oracle.send(r);
         _transferContexts[latestReqId] = TransferContext(address(0), to, uint8(1));
@@ -52,7 +53,7 @@ contract CERC20Faucet is Ownable2Step, ConfidentialERC20 {
     function callbackMakeFaucet(bytes32 reqId, CapsulatedValue[] memory values) public onlyOracle {
         TransferContext memory transferContext = _transferContexts[reqId];
         // mint
-        _balances[transferContext.receiver] = values[3].asEuint64();
+        _balances[transferContext.receiver] = values[4].asEuint64();
         delete _supplyContexts[reqId];
         emit FaucetLog(transferContext.receiver, values[2].asEuint64());
         delete _transferContexts[reqId];

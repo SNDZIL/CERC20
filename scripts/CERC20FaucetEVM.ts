@@ -76,7 +76,39 @@ async function main() {
     initialValue = await CERC20Contract.getInitialValue();
     result = await CERC20Contract.getResult();
     console.log(`initialValue after Oracle make callback: `, initialValue);
-    console.log(`Owner wallet: `, walletAddress);
+    console.log(`result(0) after Oracle make callback: `, result);
+    balance = await CERC20Contract.balanceOf(walletAddress);
+
+    console.log("-------------------------Faucet to owner-------------------------");
+    console.log(`owner balance(euint64) before Faucet callback: `, balance);
+    // CERC20Contract.mint(BigInt(500));
+    CERC20Contract.faucet(walletAddress, BigInt(500), BigInt(1500));
+    nextTest = true;
+  });
+
+  while (!nextTest) {
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  nextTest = false;
+
+  CERC20Contract.once(CERC20Contract.filters.FaucetLog, async () => {
+    balance = await CERC20Contract.balanceOf(walletAddress);
+    // target = await CERC20Contract.target;
+    // console.log(`target: `, target);
+    console.log(`owner balance(euint64) after Faucet callback: `, balance);
+    console.log("---------------------------Decrypt owner's balance---------------------------");
+    CERC20Contract.decrypteUserBalance(walletAddress);
+    nextTest = true;
+  });
+
+  while (!nextTest) {
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  nextTest = false;
+
+  CERC20Contract.once(CERC20Contract.filters.OracleCallback, async () => {
+    decryptBlance = await CERC20Contract.getDecryptBalance(walletAddress);
+    console.log(`owner balance(uint64) after Faucet callback: `, decryptBlance);
   });
 }
 
