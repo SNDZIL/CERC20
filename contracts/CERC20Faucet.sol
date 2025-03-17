@@ -34,13 +34,12 @@ contract CERC20Faucet is Ownable2Step, ConfidentialERC20 {
             "" // Payload
         );
 
-        uint64 unit = uint64(10) ** decimals();
-        uint64 range = (max - min + 1) * unit;
+        uint64 range = max - min + 1;
         uint64 shards = (type(uint64).max / range + 1);
 
         op encryptedValueA = r.rand();
         op scaled_random_value = r.div(encryptedValueA, shards);
-        op mint_amount = r.add(scaled_random_value, min * unit);
+        op mint_amount = r.add(scaled_random_value, min);
         op curr_balance = r.getEuint64(_balances[to]);
         r.add(mint_amount, curr_balance);
 
