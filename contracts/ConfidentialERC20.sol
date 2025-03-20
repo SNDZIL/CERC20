@@ -24,7 +24,7 @@ contract ConfidentialERC20 is Ownable2Step {
     uint64 private _totalSupply;
     string private _name;
     string private _symbol;
-    uint8 private _decimals = 18;
+    uint8 private _decimals = 6;
 
     euint64 private initialValue;
     bool private isInitialized = false;

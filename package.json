@@ -7,6 +7,7 @@
     "postinstall": "hardhat compile",
     "sight:start": "./launch-sight.sh",
     "sight:stop": "docker compose down -v && npm run clean",
+    "sight:restart": "npm run sight:stop; npm run sight:start",
     "clean": "hardhat clean && rimraf ./ignition/deployments ./cache ./coverage ./coverage.json ./.openzeppelin ./typechain-types"
   },
   "author": "arthur@sightai.io",
