@@ -13,7 +13,7 @@ contract ConfidentialERC20 is Ownable2Step {
     event Transfer(address indexed from, address indexed to);
     event Mint(address indexed to, uint64 amount);
     event Burn(address indexed from, uint64 amount);
-    event Approve(address indexed from, address indexed to);
+    event Approval(address indexed from, address indexed to);
     event ViewApprove(address indexed from, address indexed to);
     event withdrawApprove(address indexed from, address indexed to);
     event OracleCallback(bytes32 indexed reqId);
@@ -100,7 +100,7 @@ contract ConfidentialERC20 is Ownable2Step {
     }
 
     // total supply
-    function getTotalSupply() public view virtual returns (uint64) {
+    function totalSupply() public view virtual returns (uint64) {
         return _totalSupply;
     }
 
@@ -261,7 +261,7 @@ contract ConfidentialERC20 is Ownable2Step {
         address approver = _transferContexts[reqId].sender;
         address spender = _transferContexts[reqId].receiver;
         _allowances[approver][spender] = values[1].asEuint64();
-        emit Approve(approver, spender);
+        emit Approval(approver, spender);
         emit OracleCallback(reqId); // for testing
         delete _transferContexts[reqId];
     }

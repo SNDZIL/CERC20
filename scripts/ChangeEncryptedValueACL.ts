@@ -38,38 +38,68 @@ async function main() {
   const txRcpt = await (await decryptExample.shareACL(example.target, true)).wait();
   console.log(`Share DecryptExample ACL to ${example.target} ${txRcpt.status == 1 ? "success" : "failed"}`);
   console.log(`DecryptExample's callback addrs: ${JSON.stringify(await decryptExample.getACL())}`);
-  const txRcpt1 = await (await decryptExample.shareEncryptedValue(example.target, true)).wait();
-  console.log(
-    `Share DecryptExample capsulatedValue to ${example.target} as true: ${txRcpt1.status == 1 ? "success" : "failed"}`
-  );
-  console.log(
-    `DecryptExample's capsulatedValue owners: ${JSON.stringify(await decryptExample.getEncryptedValueOwners())}`
-  );
+
+  // First, call decryptRandomEuint64() to generate and decrypt a random value
+  console.log("Calling decryptRandomEuint64() to generate and decrypt a random value...");
+  const decryptTx = await decryptExample.decryptRandomEuint64();
+  await decryptTx.wait(1);
+  latestReqId = await decryptExample.getLatestReqId();
+
+  // Set up event listener for Oracle callback
+  decryptExample.on(decryptExample.filters.OracleCallback, async (reqId, event) => {
+    if (reqId === latestReqId) {
+      console.log("Oracle callback received for decryptRandomEuint64");
+      const capsValue = await decryptExample.capsulatedValue();
+      console.log(`DecryptExample's capsulatedValue after callback: `, explainCapsulatedValue(capsValue));
+
+      // Now that we have the capsulatedValue initialized, we can share it
+      try {
+        const txRcpt1 = await (await decryptExample.shareEncryptedValue(example.target, true)).wait();
+        console.log(
+          `Share DecryptExample capsulatedValue to ${example.target} as true: ${txRcpt1.status == 1 ? "success" : "failed"}`
+        );
+        console.log(
+          `DecryptExample's capsulatedValue owners: ${JSON.stringify(await decryptExample.getEncryptedValueOwners())}`
+        );
+
+        // Continue with the example.decryptCapsulatedValue call
+        console.log("Calling decryptCapsulatedValue with the initialized capsulatedValue...");
+
+        // Properly format the CapsulatedValue struct as expected by the contract
+        const formattedCapsValue = {
+          data: capsValue[0],
+          valueType: capsValue[1]
+        };
+
+        console.log("Formatted CapsulatedValue:", formattedCapsValue);
+
+        const tx = await example.decryptCapsulatedValue(formattedCapsValue);
+        await tx.wait(1);
+        latestReqId = await example.getLatestReqId();
+        console.log(`Sent decryptCapsulatedValue request with reqId: ${latestReqId}`);
+      } catch (error) {
+        console.error("Error sharing encrypted value:", error);
+      }
+    } else {
+      console.error("NOT MATCHED reqId");
+    }
+
+    // Only remove this listener, keep the one for example
+    decryptExample.off(decryptExample.filters.OracleCallback);
+  });
 
   example.on(example.filters.OracleCallback, async (reqId, event) => {
     if (latestReqId === reqId) {
       target = await example.getTarget();
       console.log(`target after Oracle make callback: `, explainCapsulatedValue(target));
-
-      // const txRcpt1 = await (await decryptExample.shareEncryptedValue(example.target, false)).wait();
-      // console.log(
-      //   `Share DecryptExample capsulatedValue to ${example.target} as false: ${txRcpt1.status == 1 ? "success" : "failed"}`
-      // );
-      // console.log(
-      //   `DecryptExample's capsulatedValue owners: ${JSON.stringify(await decryptExample.getEncryptedValueOwners())}`
-      // );
     } else {
       console.error("NOT MATCHED reqId");
     }
     example.off(example.filters.OracleCallback);
   });
-  const unsignedTx = await example["decryptCapsulatedValue"].populateTransaction({
-    data: target[0],
-    valueType: target[1]
-  });
-  const txResp = await accounts[0].sendTransaction({ ...unsignedTx });
-  await txResp.wait(1);
-  latestReqId = await example.getLatestReqId();
 }
 
-main();
+main().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});
